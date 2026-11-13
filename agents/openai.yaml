@@ -1,4 +1,4 @@
 interface:
   display_name: "control.skill"
-  short_description: "按项目启用本地版本管理、私有云端同步与跨设备继续执行"
+  short_description: "按项目启用本地版本管理、云端推送（GitHub同步）和可选云端执行"
   default_prompt: "使用 $control 为这个项目启用版本控制，并询问是否推送云端。"

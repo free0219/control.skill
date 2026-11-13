@@ -8,6 +8,8 @@ import re
 import subprocess
 import sys
 
+SKILL_VERSION = "2.0.0"
+
 class ControlError(Exception):
     pass
 
@@ -52,6 +54,13 @@ def load(root):
         raise ControlError("Project not enabled or unsupported configuration")
     if cfg.get("mode") not in ("local", "cloud"):
         raise ControlError("Invalid mode")
+    execution = cfg.get("cloud_execution", {"enabled": False})
+    if not isinstance(execution, dict) or type(execution.get("enabled")) is not bool:
+        raise ControlError("cloud_execution.enabled must be a boolean")
+    if "branch" in cfg:
+        if not isinstance(cfg["branch"], str) or not cfg["branch"]:
+            raise ControlError("Invalid target branch")
+        git(root, "check-ref-format", "refs/heads/" + cfg["branch"])
     if not cfg.get("allow"):
         raise ControlError("Empty allowlist")
     for pat in cfg["allow"]:
@@ -180,7 +189,8 @@ def remote_info(root, cfg):
     info = json.loads(run(["gh", "repo", "view", repo, "--json", "nameWithOwner,isPrivate"], root))
     if info.get("isPrivate") is not True or info.get("nameWithOwner", "").lower() != repo.lower():
         raise ControlError("Repository identity/privacy verification failed")
-    branch = git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    branch = cfg.get("branch") or git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    git(root, "check-ref-format", "refs/heads/" + branch)
     return branch
 
 def verify_remote(root, cfg):
@@ -239,6 +249,15 @@ def cleanup_preview(root, cfg, requested=False):
             "blockers": blockers, "deliverables": outputs,
             "required_next": "Verify external final export, review ALL files, archive remote, then bounded host cleanup"}
 
+def handoff(root, cfg):
+    return {"skill_version": SKILL_VERSION, "mode": cfg["mode"],
+            "cloud_push_enabled": cfg["mode"] == "cloud",
+            "cloud_execution_enabled": cfg.get("cloud_execution", {}).get("enabled", False),
+            "repository": cfg.get("remote"), "target_branch": cfg.get("branch"),
+            "commit": git(root, "rev-parse", "HEAD"),
+            "read_first": ["AGENTS.md", "PROJECT_STATE.md", ".agents/skills/control/SKILL.md"],
+            "cloud": cfg.get("cloud", {})}
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", required=True)
@@ -264,10 +283,7 @@ def main():
         elif a.cmd == "cleanup-preview":
             result = cleanup_preview(root, cfg, a.requested)
         else:
-            result = {"mode": cfg["mode"], "repository": cfg.get("remote"),
-                      "commit": git(root, "rev-parse", "HEAD"),
-                      "read_first": ["AGENTS.md", "PROJECT_STATE.md", ".agents/skills/control/SKILL.md"],
-                      "cloud": cfg.get("cloud", {})}
+            result = handoff(root, cfg)
         print(json.dumps(result, ensure_ascii=False, indent=2))
     except (ControlError, OSError, ValueError, KeyError) as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)

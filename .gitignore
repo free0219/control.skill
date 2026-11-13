@@ -10,7 +10,6 @@ venv/
 .env.*
 .control/
 PROJECT_STATE.md
-scripts/test_control.py
 tests/
 test-results/
 work/
