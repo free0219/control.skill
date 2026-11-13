@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.cache/
+.pytest_cache/
+.venv/
+venv/
+*.log
+*.tmp
+.env
+.env.*
+.control/
+PROJECT_STATE.md
+scripts/test_control.py
+tests/
+test-results/
+work/
+outputs/
